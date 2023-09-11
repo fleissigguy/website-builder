@@ -1,4 +1,4 @@
-```
+
 # Simple Web App Builder
 
 This project allows users to design a basic webpage with simple elements like headers, paragraphs, links, lists, and images. It provides a user-friendly interface to insert elements and preview the resulting design in real-time.
@@ -43,4 +43,3 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
-```
