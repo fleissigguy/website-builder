@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
-
 function App() {
   const [elements, setElements] = useState([]);
-  const [editing, setEditing] = useState(null); // Unified editing state
+  const [editing, setEditing] = useState(null); 
+  const [coords, setCoords] = useState({ x: 0, y: 0 }); 
+  const [isLocked, setIsLocked] = useState(false); // New state for lock mode
   const inputRef = useRef(null);
+  const previewBoxRef = useRef(null);
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -14,8 +16,9 @@ function App() {
   }, [editing]);
 
   const addElement = (type) => {
-    setElements(prev => [...prev, { type, value: getDefault(type) }]);
+    setElements(prev => [...prev, { type, value: getDefault(type), position: {...coords} }]);
   };
+
 
   const getDefault = (type) => {
     switch (type) {
@@ -32,105 +35,79 @@ function App() {
     setElements(prevElements => {
       const newElements = [...prevElements];
       newElements[editing.index].value = editing.value;
+      newElements[editing.index].position = {...coords};
       return newElements;
     });
     setEditing(null);
   };
 
-  const generateHTML = () => {
-    return elements.map(el => {
-      switch (el.type) {
-        case 'h1': return `<h1>${el.value}</h1>`;
-        case 'p': return `<p>${el.value}</p>`;
-        case 'a': return `<a href="${el.value.url}">${el.value.text}</a>`;
-        case 'ul': return `<ul>${el.value.map(item => `<li>${item}</li>`).join('')}</ul>`;
-        case 'img': return `<img src="${el.value}" alt="User uploaded image">`;
-        default: return '';
-      }
-    }).join('');
-  }
-
-  const downloadHTML = () => {
-    const blob = new Blob([generateHTML()], { type: 'text/html' });
-    const href = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = href;
-    link.download = 'website.html';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-  
-  
+  // This function adjusts the coordinates only if the click is within the preview box
+  const handlePosition = (event) => {
+    if (previewBoxRef.current && previewBoxRef.current.contains(event.target)) {
+      const bounds = previewBoxRef.current.getBoundingClientRect();
+      setCoords({ x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+    }
+  };
 
   return (
     <div className="App">
       <div className="controls-box">
-            <button onClick={() => addElement('h1')}>Add H1</button>
-            <button onClick={() => addElement('p')}>Add Paragraph</button>
-            <button onClick={() => addElement('a')}>Add Link</button>
-            <button onClick={() => addElement('ul')}>Add List</button>
-            <button onClick={() => addElement('img')}>Add Image</button>
-            <button onClick={downloadHTML}>Download Website</button>
-        </div>
+        <label>X: <input type="number" value={coords.x} onChange={(e) => setCoords({...coords, x: parseInt(e.target.value)})} /></label>
+        <label>Y: <input type="number" value={coords.y} onChange={(e) => setCoords({...coords, y: parseInt(e.target.value)})} /></label>
+        <button onClick={() => addElement('h1')}>Add H1</button>
+        <button onClick={() => addElement('p')}>Add Paragraph</button>
+        <button onClick={() => addElement('a')}>Add Link</button>
+        <button onClick={() => addElement('ul')}>Add List</button>
+        <button onClick={() => addElement('img')}>Add Image</button>
+        <button onClick={() => setIsLocked(!isLocked)}>
+          {isLocked ? 'Unlock Editor' : 'Lock Editor'}
+        </button>
+      </div>
 
-      <div className="preview-box">
+      <div className="preview-box" onClick={isLocked ? null : handlePosition} ref={previewBoxRef}>
         {elements.map((el, index) => {
-          switch (el.type) {
-            case 'h1':
-            case 'p':
-              return (
-                <div key={index} onClick={() => setEditing({ index, value: el.value, type: el.type })}>
-                  {el.value}
-                </div>
-              );
-            case 'a':
-              return (
-                <a key={index} href={el.value.url} onClick={() => setEditing({ index, value: el.value, type: el.type })}>
-                  {el.value.text}
-                </a>
-              );
-            case 'ul':
-              return (
-                <ul key={index} onClick={() => setEditing({ index, value: el.value, type: el.type })}>
-                  {el.value.map((item, i) => <li key={i}>{item}</li>)}
-                </ul>
-              );
-            case 'img':
-              return (
-                <img key={index} src={el.value} alt="Preview" onClick={() => setEditing({ index, value: el.value, type: el.type })} />
-              );
-            default:
-              return null;
-          }
+          return (
+            <div 
+              key={index}
+              style={{ position: 'absolute', left: `${el.position.x}px`, top: `${el.position.y}px` }}
+              onClick={isLocked ? null : () => {
+                setEditing({ index, value: el.value, type: el.type });
+                setCoords(el.position);
+              }}
+            >
+
+              {el.type === 'h1' && <h1>{el.value}</h1>}
+              {el.type === 'p' && <p>{el.value}</p>}
+              {el.type === 'a' && <a href={el.value.url}>{el.value.text}</a>}
+              {el.type === 'ul' && <ul>{el.value.map((item, i) => <li key={i}>{item}</li>)}</ul>}
+              {el.type === 'img' && <img src={el.value} alt="Preview" />}
+            </div>
+          );
         })}
       </div>
 
       {editing && (
         <div className="editing-modal">
-          {editing.type === 'h1' && (
+          <div>
+            <label>X: <input type="number" value={coords.x} onChange={(e) => setCoords({...coords, x: parseInt(e.target.value)})} /></label>
+            <label>Y: <input type="number" value={coords.y} onChange={(e) => setCoords({...coords, y: parseInt(e.target.value)})} /></label>
+          </div>
+          {['h1', 'p', 'img'].includes(editing.type) && (
             <input 
-              ref={inputRef}
-              value={editing.value}
-              onChange={e => setEditing(prev => ({ ...prev, value: e.target.value }))}
-            />
-          )}
-          {editing.type === 'p' && (
-            <input 
-              ref={inputRef}
-              value={editing.value}
+              ref={inputRef} 
+              value={editing.value} 
               onChange={e => setEditing(prev => ({ ...prev, value: e.target.value }))}
             />
           )}
           {editing.type === 'a' && (
             <div>
               <input 
-                ref={inputRef}
-                value={editing.value.text}
+                ref={inputRef} 
+                value={editing.value.text} 
                 onChange={e => setEditing(prev => ({ ...prev, value: { ...prev.value, text: e.target.value } }))}
               />
               <input 
-                value={editing.value.url}
+                value={editing.value.url} 
                 onChange={e => setEditing(prev => ({ ...prev, value: { ...prev.value, url: e.target.value } }))}
               />
             </div>
@@ -150,13 +127,6 @@ function App() {
                 />
               ))}
             </div>
-          )}
-          {editing.type === 'img' && (
-            <input 
-              ref={inputRef}
-              value={editing.value}
-              onChange={e => setEditing(prev => ({ ...prev, value: e.target.value }))}
-            />
           )}
           <button onClick={handleSave}>Save</button>
         </div>
